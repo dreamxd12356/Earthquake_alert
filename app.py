@@ -1,139 +1,111 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import matplotlib.pyplot as plt
 
 # Load model and scaler
 model = joblib.load("earthquake_alert_model.joblib")
 scaler = joblib.load("scaler.joblib")
 
-# Set page config
-st.set_page_config(page_title="Earthquake Dashboard", layout="wide")
+# Page config
+st.set_page_config(page_title="Earthquake Alert System", layout="wide")
 
-# Sidebar navigation menu
-st.sidebar.title("☄️ Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Predict Alert Level", "Alert Definitions", "Settings"])
+# Sidebar
+st.sidebar.title("📊 Navigation")
+page = st.sidebar.radio("Go to", [
+    "Upload & Analyze", "Predict Single Alert", "Alert Definitions", "Settings"
+])
 
-# Theme switcher 
+# Theme state
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
+# Apply theme styles
 if theme == "dark":
     st.markdown("""
     <style>
-    body, .stApp {
-        background-color: #1e1e1e;
-        color: #ffffff;
-    }
-    .css-1d391kg, .css-18e3th9 {
-        background-color: #1e1e1e;
-        color: white;
-    }
+    body, .stApp { background-color: #1e1e1e; color: white; }
+    .css-1d391kg, .css-18e3th9 { background-color: #1e1e1e; color: white; }
     </style>
     """, unsafe_allow_html=True)
 else:
     st.markdown("""
     <style>
-    body, .stApp {
-        background-color: #f5f7fa;
-        color: #000000;
-    }
-    .css-1d391kg, .css-18e3th9 {
-        background-color: white;
-        color: black;
-    }
+    body, .stApp { background-color: #f5f7fa; color: black; }
+    .css-1d391kg, .css-18e3th9 { background-color: white; color: black; }
     </style>
     """, unsafe_allow_html=True)
 
-# Page logic
-if page == "Dashboard":
-    st.markdown("## 📊 Earthquake Dashboard Overview")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("🌐 Events Tracked", "9,512", "+12")
-    col2.metric("🟢 Low Risk", "6,211", "-5%")
-    col3.metric("🔴 High Risk", "1,103", "+14%")
-    st.markdown("✅ More charts and summaries coming soon!")
+# Upload and Analyze
+if page == "Upload & Analyze":
+    st.title("📂 Upload Earthquake CSV and Predict Alerts")
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
-elif page == "Predict Alert Level":
-    st.markdown("## 🚨 Predict Earthquake Alert Level")
-    with st.form("predict_form"):
-        c1, c2 = st.columns(2)
-        with c1:
-            latitude = st.number_input("Latitude", -90.0, 90.0, 35.0)
-            longitude = st.number_input("Longitude", -180.0, 180.0, 139.0)
-            depth = st.number_input("Depth (km)", 0.0, 700.0, 10.0)
-            mag = st.number_input("Magnitude", 4.5, 10.0, 7.5)
-            magType = st.selectbox("Magnitude Type", ["mb", "ml", "ms", "mw", "mwr", "mwc"])
-            status = st.selectbox("Status", ["reviewed", "automatic"])
-        with c2:
-            nst = st.number_input("Station Count", 0, 500, 100)
-            gap = st.number_input("Azimuthal Gap", 0.0, 360.0, 40.0)
-            dmin = st.number_input("Min Station Distance", 0.0, 20.0, 0.5)
-            rms = st.number_input("RMS", 0.0, 5.0, 1.1)
-            magError = st.number_input("Magnitude Error", 0.0, 10.0, 0.1)
-            magNst = st.number_input("MagNst", 0, 500, 20)
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        st.markdown("### 🧾 Preview")
+        st.dataframe(df.head())
 
-        year = st.number_input("Year", 1976, 2025, 2023)
-        month = st.slider("Month", 1, 12, 6)
-        hour = st.slider("Hour", 0, 23, 12)
+        required_cols = ["latitude", "longitude", "depth", "mag", "magType",
+                         "nst", "gap", "dmin", "rms", "horizontalError",
+                         "depthError", "magError", "magNst", "status",
+                         "locationSource", "magSource", "type",
+                         "year", "month", "hour"]
 
-        submitted = st.form_submit_button("Predict")
-
-        if submitted:
-            def encode(val, ref):
+        if all(col in df.columns for col in required_cols):
+            def encode(val):
                 enc = {
                     'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
                     'automatic': 0, 'reviewed': 1,
+                    'ci': 0, 'hv': 1, 'nc': 2, 'nm': 3, 'se': 4, 'us': 5,
                     'earthquake': 0
                 }
                 return enc.get(val, 0)
 
-            input_data = [[
-                latitude, longitude, depth, mag,
-                encode(magType, "magType"),
-                nst, gap, dmin, rms, 1.0, 1.0, magError, magNst,
-                encode(status, "status"), 0, 0, 0,
-                year, month, hour
-            ]]
-            input_scaled = scaler.transform(input_data)
-            pred = model.predict(input_scaled)[0]
+            # Encode categories
+            df["magType"] = df["magType"].apply(encode)
+            df["status"] = df["status"].apply(encode)
+            df["locationSource"] = df["locationSource"].apply(encode)
+            df["magSource"] = df["magSource"].apply(encode)
+            df["type"] = df["type"].apply(encode)
+
+            # Predict
+            features = df[required_cols]
+            scaled = scaler.transform(features)
+            preds = model.predict(scaled)
             alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
-            st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred, pred)}**")
+            df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
 
-elif page == "Alert Definitions":
-    st.markdown("## 📘 Alert Level Definitions")
-    st.markdown("""
-    - 🟢 **Green**: Minimal risk — informational only.  
-    - 🟡 **Yellow**: Moderate impact possible — stay aware.  
-    - 🟠 **Orange**: High risk — prepare emergency plans.  
-    - 🔴 **Red**: Severe impact expected — take immediate action.
-    """)
+            st.success("✅ Prediction complete!")
+            st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head(10))
 
-elif page == "Settings":
-    st.markdown("## ⚙️ Settings")
-    st.markdown("### 🎨 Theme Preferences")
+            st.markdown("### 📊 Alert Distribution")
+            summary = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
+            fig, ax = plt.subplots()
+            ax.bar(summary["Alert"], summary["Count"], color=["green", "orange", "red", "gold"])
+            ax.set_ylabel("Count")
+            ax.set_title("Predicted Alert Level Distribution")
+            st.pyplot(fig)
+        else:
+            st.error("❌ Missing required columns in the uploaded file.")
 
-   
-    theme_choice = st.radio(
-        "Choose your theme:",
-        ["light", "dark"],
-        index=0 if st.session_state.theme == "light" else 1
-    )
-
-    st.session_state.theme = theme_choice
-
-    
-    st.markdown(
-        f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>",
-        unsafe_allow_html=True
-    )
-
-
-
-
-
-
-
-
-
-
+# Single Prediction
+elif page == "Predict Single Alert":
+    st.title("🚨 Predict Earthquake Alert Level")
+    with st.form("predict_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            latitude = st.number_input("Latitude", -90.0, 90.0, 10.0)
+            longitude = st.number_input("Longitude", -180.0, 180.0, 70.0)
+            depth = st.number_input("Depth (km)", 0.0, 700.0, 10.0)
+            mag = st.number_input("Magnitude", 4.5, 10.0, 6.0)
+            magType = st.selectbox("Magnitude Type", ["mb", "ml", "ms", "mw", "mwr", "mwc"])
+            status = st.selectbox("Status", ["reviewed", "automatic"])
+        with col2:
+            nst = st.number_input("Station Count", 0, 500, 100)
+            gap = st.number_input("Azimuthal Gap", 0.0, 360.0, 45.0)
+            dmin = st.number_input("Min Station Distance", 0.0, 20.0, 1.0)
+            rms = st.number_input("RMS", 0.0, 5.0, 1.0)
+            magError = st.number_input("Magnitude Error", 0.0, 10.0, 0.2)
+            magNst = st.number_input("MagNst", 0,_
