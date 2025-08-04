@@ -126,11 +126,12 @@ elif page == "Settings":
 
     st.session_state.theme = theme_choice
 
-    # Feedback message in yellow
+    
     st.markdown(
-        f"<h4 style='color:yellow;'>✅ Theme set to: {theme_choice.upper()} MODE</h4>",
+        f"<h4 style='color:yellow;'>Theme set to: {theme_choice.upper()} MODE</h4>",
         unsafe_allow_html=True
     )
+
 
 
 
