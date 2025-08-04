@@ -6,81 +6,97 @@ import joblib
 model = joblib.load("earthquake_alert_model.joblib")
 scaler = joblib.load("scaler.joblib")
 
-# Page settings
-st.set_page_config(page_title="🌍 Earthquake Alert Predictor", layout="centered")
-st.markdown("<h1 style='text-align: center; color: #F63366;'>🌍 Earthquake Alert Prediction System</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Enter seismic details to predict the <strong>ALERT LEVEL</strong>.</p>", unsafe_allow_html=True)
+# Set page config
+st.set_page_config(page_title="Earthquake Dashboard", layout="wide")
 
-# Optional: Darken background or customize style
-# st.markdown("<style>body { background-color: #1e1e2f; }</style>", unsafe_allow_html=True)
-
-# Input fields in columns
-col1, col2 = st.columns(2)
-
-with col1:
-    latitude = st.number_input("🌐 Latitude", -90.0, 90.0, 0.0)
-    depth = st.number_input("⛏️ Depth (km)", 0.0, 700.0, 10.0)
-    mag = st.number_input("💥 Magnitude", 4.5, 10.0, 5.0)
-    magType = st.selectbox("📏 Magnitude Type", ["mb", "ml", "ms", "mw", "mwr", "mwc"])
-    nst = st.number_input("📡 Number of Stations", 0, 500, 50)
-    gap = st.number_input("📐 Azimuthal Gap", 0.0, 360.0, 50.0)
-    dmin = st.number_input("📏 Min. Station Distance", 0.0, 20.0, 1.0)
-    rms = st.number_input("📈 RMS", 0.0, 5.0, 1.0)
-
-with col2:
-    longitude = st.number_input("🌐 Longitude", -180.0, 180.0, 0.0)
-    horizontalError = st.number_input("📍 Horizontal Error", 0.0, 50.0, 1.0)
-    depthError = st.number_input("⛏️ Depth Error", 0.0, 50.0, 1.0)
-    magError = st.number_input("💥 Magnitude Error", 0.0, 10.0, 0.1)
-    magNst = st.number_input("🔢 Magnitude Station Count", 0, 500, 10)
-    status = st.selectbox("🔧 Status", ["reviewed", "automatic"])
-    locationSource = st.selectbox("🌎 Location Source", ["ci", "us", "hv", "nc", "nm", "se"])
-    magSource = st.selectbox("🔍 Magnitude Source", ["ci", "us", "hv", "nc", "nm", "se"])
-    type_ = st.selectbox("🌋 Event Type", ["earthquake"])
-
-# Time inputs
-year = st.number_input("📆 Year", 1976, 2025, 2023)
-month = st.slider("📅 Month", 1, 12, 6)
-hour = st.slider("⏰ Hour", 0, 23, 12)
-
-# Categorical encodings
-def encode_categorical(col, val):
-    enc = {
-        'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
-        'automatic': 0, 'reviewed': 1,
-        'ci': 0, 'hv': 1, 'nc': 2, 'nm': 3, 'se': 4, 'us': 5,
-        'earthquake': 0
+# Custom CSS to mimic dashboard layout
+st.markdown("""
+<style>
+    .main {
+        background-color: #f5f7fa;
+        padding: 1rem;
     }
-    return enc.get(val, 0)
+    .block-container {
+        padding: 2rem 1rem 2rem 1rem;
+    }
+    .header {
+        font-size: 32px;
+        font-weight: bold;
+        color: #1f1f1f;
+        margin-bottom: 1rem;
+    }
+    .card {
+        background-color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        margin-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Predict button
-if st.button("Predict Alert Level"):
-    input_data = [[
-        latitude, longitude, depth, mag,
-        encode_categorical("magType", magType),
-        nst, gap, dmin, rms,
-        horizontalError, depthError, magError, magNst,
-        encode_categorical("status", status),
-        encode_categorical("locationSource", locationSource),
-        encode_categorical("magSource", magSource),
-        encode_categorical("type", type_),
-        year, month, hour
-    ]]
-    input_scaled = scaler.transform(input_data)
-    pred = model.predict(input_scaled)[0]
+# Sidebar navigation
+with st.sidebar:
+    st.markdown("## ☄️ Dashboard Navigation")
+    st.markdown("🔍 **Predict Alert Level**")
+    st.markdown("📊 Earthquake Stats (Coming Soon)")
+    st.markdown("🧾 Alert Definitions")
+    st.markdown("⚙️ Settings")
+
+# Header
+st.markdown('<div class="header">🌍 Earthquake Alert Prediction Dashboard</div>', unsafe_allow_html=True)
+
+# Layout: 3-column grid for stats (sample)
+col1, col2, col3 = st.columns(3)
+col1.metric("🌐 Events Tracked", "9,512", "+12")
+col2.metric("🟢 Low Risk", "6,211", "-5%")
+col3.metric("🔴 High Risk", "1,103", "+14%")
+
+st.markdown("### 🚨 Predict Earthquake Alert Level")
+with st.form("predict_form"):
+    c1, c2 = st.columns(2)
+    with c1:
+        latitude = st.number_input("Latitude", -90.0, 90.0, 35.0)
+        longitude = st.number_input("Longitude", -180.0, 180.0, 139.0)
+        depth = st.number_input("Depth (km)", 0.0, 700.0, 10.0)
+        mag = st.number_input("Magnitude", 4.5, 10.0, 7.5)
+        magType = st.selectbox("Magnitude Type", ["mb", "ml", "ms", "mw", "mwr", "mwc"])
+        status = st.selectbox("Status", ["reviewed", "automatic"])
+    with c2:
+        nst = st.number_input("Station Count", 0, 500, 100)
+        gap = st.number_input("Azimuthal Gap", 0.0, 360.0, 40.0)
+        dmin = st.number_input("Min Station Distance", 0.0, 20.0, 0.5)
+        rms = st.number_input("RMS", 0.0, 5.0, 1.1)
+        magError = st.number_input("Magnitude Error", 0.0, 10.0, 0.1)
+        magNst = st.number_input("MagNst", 0, 500, 20)
     
-    alert_map = {0: "green", 1: "orange", 2: "red", 3: "yellow"}
-    pred_label = alert_map.get(pred, str(pred)).upper()
-    st.success(f"**Predicted Alert Level: {pred_label}**")
+    year = st.number_input("Year", 1976, 2025, 2023)
+    month = st.slider("Month", 1, 12, 6)
+    hour = st.slider("Hour", 0, 23, 12)
 
-    # Alert level meaning
-    st.markdown("""
-    <hr>
-    <h4>🧾 Alert Level Definitions</h4>
-    <ul>
-        <li><span style="color:green;"><strong>GREEN:</strong></span> Low impact, no immediate danger.</li>
-        <li><span style="color:gold;"><strong>YELLOW:</strong></span> Moderate impact possible.</li>
-        <li><span style="color:orange;"><strong>ORANGE:</strong></span> High risk of damage, stay alert.</li>
-        <li><span style="color:red;"><strong>RED:</strong></span> Critical situation, immediate action required.</li>
-    </ul>
-    """, unsafe_allow_html=True)
+    submitted = st.form_submit_button("Predict")
+
+    if submitted:
+        def encode(val, ref):
+            enc = {
+                'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
+                'automatic': 0, 'reviewed': 1,
+                'earthquake': 0
+            }
+            return enc.get(val, 0)
+
+        input_data = [[
+            latitude, longitude, depth, mag,
+            encode(magType, "magType"),
+            nst, gap, dmin, rms, 1.0, 1.0, magError, magNst,
+            encode(status, "status"), 0, 0, 0,
+            year, month, hour
+        ]]
+        input_scaled = scaler.transform(input_data)
+        pred = model.predict(input_scaled)[0]
+        alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
+        st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred, pred)}**")
+
+st.markdown("---")
+st.markdown("#### ℹ️ Alert Level Guide")
+st.info("🟢 **Green**: Minimal risk | 🟡 **Yellow**: Moderate risk | 🟠 **Orange**: High caution | 🔴 **Red**: Critical threat")
