@@ -78,7 +78,7 @@ elif page == "Predict Alert Level":
             input_scaled = scaler.transform(input_data)
             pred = model.predict(input_scaled)[0]
             alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
-            st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred, pred)}**")
+            st.success(f"Predicted Alert Level: **{alert_map.get(pred, pred)}**")
 
 elif page == "Alert Definitions":
     st.markdown('<div class="header">📘 Alert Level Definitions</div>', unsafe_allow_html=True)
@@ -92,4 +92,5 @@ elif page == "Alert Definitions":
 elif page == "Settings":
     st.markdown('<div class="header">⚙️ Settings</div>', unsafe_allow_html=True)
     st.markdown("Coming soon: model versioning, user preferences, and theme switcher.")
+
 
