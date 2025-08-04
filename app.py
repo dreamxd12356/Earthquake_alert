@@ -117,8 +117,8 @@ elif page == "Settings":
     theme_choice = st.radio(
         "Select Theme",
         [
-            "🌞 <span style='color:yellow'><b>LIGHT</b></span>",
-            "🌙 <span style='color:yellow'><b>DARK</b></span>"
+            "🌞"
+            "🌙"
         ],
         index=0 if theme == "light" else 1,
         key="theme_radio",
@@ -133,6 +133,7 @@ elif page == "Settings":
         f"<h4 style='color:yellow;'>✅ Theme set to: {selected_theme.upper()} MODE</h4>",
         unsafe_allow_html=True
     )
+
 
 
 
