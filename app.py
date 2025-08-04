@@ -13,7 +13,7 @@ st.set_page_config(page_title="Earthquake Dashboard", layout="wide")
 st.sidebar.title("☄️ Navigation")
 page = st.sidebar.radio("Go to", ["Dashboard", "Predict Alert Level", "Alert Definitions", "Settings"])
 
-# Theme switcher (global CSS based on session_state)
+# Theme switcher 
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
@@ -111,10 +111,26 @@ elif page == "Alert Definitions":
 
 elif page == "Settings":
     st.markdown("## ⚙️ Settings")
-    st.markdown("### 🎨 Theme Preferences")
 
-   st.markdown("### <span style='color:yellow;'>🎨 Choose Theme</span>", unsafe_allow_html=True)
-    theme_choice = st.radio("", ["light", "dark"], index=0 if st.session_state.theme == "light" else 1)
-    st.markdown(f"<h4 style='color:yellow;'>Theme set to: {theme_choice.upper()} MODE</h4>", unsafe_allow_html=True)
+    st.markdown("### <span style='color:yellow;'>🎨 Theme Preferences</span>", unsafe_allow_html=True)
+
+    # Theme switcher logic
+    if "theme" not in st.session_state:
+        st.session_state.theme = "light"
+
+    theme_choice = st.radio(
+        "Select a theme:",
+        ["light", "dark"],
+        index=0 if st.session_state.theme == "light" else 1
+    )
+
+    st.session_state.theme = theme_choice
+
+    # Feedback message in yellow
+    st.markdown(
+        f"<h4 style='color:yellow;'>✅ Theme set to: {theme_choice.upper()} MODE</h4>",
+        unsafe_allow_html=True
+    )
+
 
 
