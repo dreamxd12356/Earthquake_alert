@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
-import io
 
 # Load model and scaler
 model = joblib.load("earthquake_alert_model.joblib")
@@ -48,59 +47,65 @@ section = st.sidebar.radio("Choose Page", [
     "⚙️ Settings"
 ])
 
-# Theme state
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
+# Encode function
+def encode(val):
+    enc = {
+        'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
+        'automatic': 0, 'reviewed': 1,
+        'ci': 0, 'hv': 1, 'nc': 2, 'nm': 3, 'se': 4, 'us': 5,
+        'earthquake': 0
+    }
+    return enc.get(val, 0)
+
+required_cols = [
+    "latitude", "longitude", "depth", "mag", "magType",
+    "nst", "gap", "dmin", "rms", "horizontalError",
+    "depthError", "magError", "magNst", "status",
+    "locationSource", "magSource", "type",
+    "year", "month", "hour"
+]
+
+default_values = {
+    "latitude": 0.0, "longitude": 0.0, "depth": 10.0, "mag": 5.0, "magType": "mb",
+    "nst": 100, "gap": 45.0, "dmin": 1.0, "rms": 1.0, "horizontalError": 1.0,
+    "depthError": 1.0, "magError": 0.2, "magNst": 20, "status": "reviewed",
+    "locationSource": "ci", "magSource": "ci", "type": "earthquake",
+    "year": 2023, "month": 6, "hour": 12
+}
+
 # Upload & Analyze Page
 if section == "📂 Upload & Analyze":
-    st.title("📂 Upload Earthquake CSV and Predict Alerts")
-    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    st.title("📂 Upload Earthquake Data")
+    uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
     if uploaded_file:
-        df = pd.read_csv(uploaded_file)
+        try:
+            if uploaded_file.name.endswith(".xlsx"):
+                df = pd.read_excel(uploaded_file)
+            else:
+                df = pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.error(f"❌ Error reading file: {e}")
+            st.stop()
+
         st.markdown("### 🧾 File Preview")
         st.dataframe(df.head())
-
-        required_cols = [
-            "latitude", "longitude", "depth", "mag", "magType",
-            "nst", "gap", "dmin", "rms", "horizontalError",
-            "depthError", "magError", "magNst", "status",
-            "locationSource", "magSource", "type",
-            "year", "month", "hour"
-        ]
-
-        default_values = {
-            "latitude": 0.0, "longitude": 0.0, "depth": 10.0, "mag": 5.0,
-            "magType": "mb", "nst": 100, "gap": 45.0, "dmin": 1.0,
-            "rms": 1.0, "horizontalError": 1.0, "depthError": 1.0,
-            "magError": 0.2, "magNst": 20, "status": "reviewed",
-            "locationSource": "ci", "magSource": "ci", "type": "earthquake",
-            "year": 2023, "month": 6, "hour": 12
-        }
 
         missing_cols = [col for col in required_cols if col not in df.columns]
         for col in missing_cols:
             df[col] = default_values[col]
-
         if missing_cols:
-            st.warning("""
-            ⚠️ The following required columns were missing from your file and have been filled with default values:
-            
-            **Missing Columns:** `{', '.join(missing_cols)}`
+            st.info(f"""
+            ℹ️ Your file was missing the following columns, which were filled with default values:
+
+            **{', '.join(missing_cols)}**
             """)
 
-        def encode(val):
-            enc = {
-                'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
-                'automatic': 0, 'reviewed': 1,
-                'ci': 0, 'hv': 1, 'nc': 2, 'nm': 3, 'se': 4, 'us': 5,
-                'earthquake': 0
-            }
-            return enc.get(val, 0)
-
-        # Encode categorical
+        # Encode categoricals
         df["magType"] = df["magType"].apply(encode)
         df["status"] = df["status"].apply(encode)
         df["locationSource"] = df["locationSource"].apply(encode)
@@ -109,11 +114,12 @@ if section == "📂 Upload & Analyze":
 
         df_scaled = scaler.transform(df[required_cols])
         preds = model.predict(df_scaled)
+
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
 
         st.success("✅ Predictions completed!")
-        st.dataframe(df.head())
+        st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
 
         st.markdown("### 📊 Alert Distribution")
         count_df = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
@@ -123,10 +129,17 @@ if section == "📂 Upload & Analyze":
         ax.set_title("Predicted Alert Level Distribution")
         st.pyplot(fig)
 
-        st.markdown("### 🗺️ Map View")
+        # Map View
+        st.markdown("### 🗺️ Map of Earthquake Locations")
         st.map(df[["latitude", "longitude"]])
 
-        st.download_button("📥 Download Predictions as CSV", df.to_csv(index=False), file_name="predictions.csv", mime="text/csv")
+        # Download prediction
+        st.download_button(
+            label="📥 Download Predictions as CSV",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name="predictions.csv",
+            mime="text/csv"
+        )
 
 # Single Prediction Page
 elif section == "🚨 Single Prediction":
@@ -153,14 +166,6 @@ elif section == "🚨 Single Prediction":
         submitted = st.form_submit_button("Predict")
 
     if submitted:
-        def encode(val):
-            enc = {
-                'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
-                'automatic': 0, 'reviewed': 1,
-                'earthquake': 0
-            }
-            return enc.get(val, 0)
-
         input_data = [[
             latitude, longitude, depth, mag, encode(magType), nst, gap, dmin,
             rms, 1.0, 1.0, magError, magNst, encode(status), 0, 0, 0, year, month, hour
