@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import joblib
@@ -53,6 +52,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
+# ========================= Upload & Analyze Page =========================
 if section == "📂 Upload & Analyze":
     st.title("📂 Upload Earthquake File and Predict Alerts")
     uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
@@ -86,7 +86,6 @@ if section == "📂 Upload & Analyze":
         missing_cols = [col for col in required_cols if col not in df.columns]
         for col in missing_cols:
             df[col] = default_values[col]
-
         if missing_cols:
             st.info(f"ℹ️ Missing columns auto-filled: {', '.join(missing_cols)}")
 
@@ -105,8 +104,7 @@ if section == "📂 Upload & Analyze":
         df["magSource"] = df["magSource"].apply(encode)
         df["type"] = df["type"].apply(encode)
 
-        X = df[required_cols]
-        scaled = scaler.transform(X)
+        scaled = scaler.transform(df[required_cols])
         preds = model.predict(scaled)
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
@@ -126,15 +124,15 @@ if section == "📂 Upload & Analyze":
         st.map(df[["latitude", "longitude"]])
 
         st.markdown("### 📥 Download Predictions")
-        file_format = st.radio("Choose Format", ["CSV", "Excel"])
-        if file_format == "CSV":
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV", data=csv, file_name="predictions.csv", mime="text/csv")
+        fmt = st.radio("Download format", ["CSV", "Excel"])
+        if fmt == "CSV":
+            st.download_button("⬇️ Download CSV", data=df.to_csv(index=False).encode("utf-8"), file_name="alerts.csv", mime="text/csv")
         else:
-            buffer = BytesIO()
-            df.to_excel(buffer, index=False, engine="openpyxl")
-            st.download_button("Download Excel", data=buffer.getvalue(), file_name="predictions.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            buf = BytesIO()
+            df.to_excel(buf, index=False, engine="openpyxl")
+            st.download_button("⬇️ Download Excel", data=buf.getvalue(), file_name="alerts.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+# ========================= Single Prediction =========================
 elif section == "🚨 Single Prediction":
     st.title("🚨 Predict a Single Earthquake Alert Level")
     with st.form("predict_form"):
@@ -167,21 +165,20 @@ elif section == "🚨 Single Prediction":
             }
             return enc.get(val, 0)
 
-        input_dict = {
-            "latitude": latitude, "longitude": longitude, "depth": depth,
-            "mag": mag, "magType": encode(magType), "nst": nst, "gap": gap,
-            "dmin": dmin, "rms": rms, "horizontalError": 1.0, "depthError": 1.0,
-            "magError": magError, "magNst": magNst, "status": encode(status),
-            "locationSource": 0, "magSource": 0, "type": 0,
+        input_data = pd.DataFrame([{
+            "latitude": latitude, "longitude": longitude, "depth": depth, "mag": mag,
+            "magType": encode(magType), "nst": nst, "gap": gap, "dmin": dmin, "rms": rms,
+            "horizontalError": 1.0, "depthError": 1.0, "magError": magError, "magNst": magNst,
+            "status": encode(status), "locationSource": 0, "magSource": 0, "type": 0,
             "year": year, "month": month, "hour": hour
-        }
+        }])
 
-        input_df = pd.DataFrame([input_dict])
-        scaled = scaler.transform(input_df)
+        scaled = scaler.transform(input_data)
         pred = model.predict(scaled)[0]
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
 
+# ========================= Alert Guide Page =========================
 elif section == "📘 Alert Guide":
     st.title("📘 Earthquake Alert Level Guide")
     st.markdown("""
@@ -191,6 +188,7 @@ elif section == "📘 Alert Guide":
     - 🔴 **Red**: Severe — immediate action needed  
     """)
 
+# ========================= Settings Page =========================
 elif section == "⚙️ Settings":
     st.title("⚙️ App Settings")
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
