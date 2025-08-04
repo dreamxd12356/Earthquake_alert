@@ -112,25 +112,23 @@ elif page == "Alert Definitions":
 elif page == "Settings":
     st.markdown("## ⚙️ Settings")
 
-    st.markdown("### <span style='color:yellow;'>🎨 Theme Preferences</span>", unsafe_allow_html=True)
+  st.markdown("### 🎨 Theme Preferences")
 
-    # Theme switcher logic
-    if "theme" not in st.session_state:
-        st.session_state.theme = "light"
+theme_choice = st.radio("Select Theme", [
+    "🌞 <span style='color:yellow'><b>LIGHT</b></span>",
+    "🌙 <span style='color:yellow'><b>DARK</b></span>"
+], index=0 if theme == "light" else 1, key="theme_radio", format_func=lambda x: x, label_visibility="visible")
 
-    theme_choice = st.radio(
-        "Select a theme:",
-        ["light", "dark"],
-        index=0 if st.session_state.theme == "light" else 1
-    )
+# Determine raw value from label
+selected_theme = "light" if "LIGHT" in theme_choice.upper() else "dark"
+st.session_state.theme = selected_theme
 
-    st.session_state.theme = theme_choice
+st.markdown(
+    f"<h4 style='color:yellow;'>✅ Theme set to: {selected_theme.upper()} MODE</h4>",
+    unsafe_allow_html=True
+)
 
-    
-    st.markdown(
-        f"<h4 style='color:yellow;'>Theme set to: {theme_choice.upper()} MODE</h4>",
-        unsafe_allow_html=True
-    )
+
 
 
 
