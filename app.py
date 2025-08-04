@@ -7,10 +7,8 @@ import matplotlib.pyplot as plt
 model = joblib.load("earthquake_alert_model.joblib")
 scaler = joblib.load("scaler.joblib")
 
-# Page config
 st.set_page_config(page_title="Earthquake Alert System", layout="wide")
 
-# Sidebar
 st.sidebar.title("📊 Navigation")
 page = st.sidebar.radio("Go to", [
     "Upload & Analyze", "Predict Single Alert", "Alert Definitions", "Settings"
@@ -21,7 +19,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
-# Apply theme styles
+# Theme styling
 if theme == "dark":
     st.markdown("""
     <style>
@@ -37,7 +35,7 @@ else:
     </style>
     """, unsafe_allow_html=True)
 
-# Upload and Analyze
+# Upload & Analyze
 if page == "Upload & Analyze":
     st.title("📂 Upload Earthquake CSV and Predict Alerts")
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
@@ -63,14 +61,12 @@ if page == "Upload & Analyze":
                 }
                 return enc.get(val, 0)
 
-            # Encode categories
             df["magType"] = df["magType"].apply(encode)
             df["status"] = df["status"].apply(encode)
             df["locationSource"] = df["locationSource"].apply(encode)
             df["magSource"] = df["magSource"].apply(encode)
             df["type"] = df["type"].apply(encode)
 
-            # Predict
             features = df[required_cols]
             scaled = scaler.transform(features)
             preds = model.predict(scaled)
@@ -108,4 +104,47 @@ elif page == "Predict Single Alert":
             dmin = st.number_input("Min Station Distance", 0.0, 20.0, 1.0)
             rms = st.number_input("RMS", 0.0, 5.0, 1.0)
             magError = st.number_input("Magnitude Error", 0.0, 10.0, 0.2)
-            magNst = st.number_input("MagNst", 0,_
+            magNst = st.number_input("MagNst", 0, 500, 20)
+        year = st.number_input("Year", 1976, 2025, 2023)
+        month = st.slider("Month", 1, 12, 6)
+        hour = st.slider("Hour", 0, 23, 12)
+        submitted = st.form_submit_button("Predict")
+
+    if submitted:
+        def encode(val):
+            enc = {
+                'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
+                'automatic': 0, 'reviewed': 1,
+                'earthquake': 0
+            }
+            return enc.get(val, 0)
+
+        input_data = [[
+            latitude, longitude, depth, mag, encode(magType), nst, gap, dmin,
+            rms, 1.0, 1.0, magError, magNst, encode(status), 0, 0, 0, year, month, hour
+        ]]
+        scaled = scaler.transform(input_data)
+        pred = model.predict(scaled)[0]
+        alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
+        st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
+
+# Alert Definitions
+elif page == "Alert Definitions":
+    st.title("📘 Alert Level Definitions")
+    st.markdown("""
+    - 🟢 **Green**: Minimal risk  
+    - 🟡 **Yellow**: Moderate risk  
+    - 🟠 **Orange**: High potential impact  
+    - 🔴 **Red**: Critical impact expected  
+    """)
+
+# Settings
+elif page == "Settings":
+    st.title("⚙️ Settings")
+    st.markdown("### 🎨 Theme Preferences")
+    theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
+    st.session_state.theme = theme_choice
+    st.markdown(
+        f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>",
+        unsafe_allow_html=True
+    )
