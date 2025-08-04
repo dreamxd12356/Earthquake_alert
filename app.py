@@ -52,7 +52,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
-# ========================= Upload & Analyze Page =========================
+# ========================= Upload & Analyze =========================
 if section == "📂 Upload & Analyze":
     st.title("📂 Upload Earthquake File and Predict Alerts")
     uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
@@ -104,7 +104,9 @@ if section == "📂 Upload & Analyze":
         df["magSource"] = df["magSource"].apply(encode)
         df["type"] = df["type"].apply(encode)
 
-        scaled = scaler.transform(df[required_cols])
+        df_model = df[required_cols].copy()
+        df_model.columns = scaler.feature_names_in_
+        scaled = scaler.transform(df_model)
         preds = model.predict(scaled)
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
@@ -173,12 +175,13 @@ elif section == "🚨 Single Prediction":
             "year": year, "month": month, "hour": hour
         }])
 
+        input_data.columns = scaler.feature_names_in_
         scaled = scaler.transform(input_data)
         pred = model.predict(scaled)[0]
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
 
-# ========================= Alert Guide Page =========================
+# ========================= Alert Guide =========================
 elif section == "📘 Alert Guide":
     st.title("📘 Earthquake Alert Level Guide")
     st.markdown("""
@@ -188,7 +191,7 @@ elif section == "📘 Alert Guide":
     - 🔴 **Red**: Severe — immediate action needed  
     """)
 
-# ========================= Settings Page =========================
+# ========================= Settings =========================
 elif section == "⚙️ Settings":
     st.title("⚙️ App Settings")
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
