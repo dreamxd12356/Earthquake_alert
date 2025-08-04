@@ -13,29 +13,49 @@ st.set_page_config(page_title="Earthquake Dashboard", layout="wide")
 st.sidebar.title("☄️ Navigation")
 page = st.sidebar.radio("Go to", ["Dashboard", "Predict Alert Level", "Alert Definitions", "Settings"])
 
-# Custom styling
-st.markdown("""
-<style>
-    .main { background-color: #f5f7fa; }
-    .block-container { padding: 2rem 1rem 2rem 1rem; }
-    .header { font-size: 32px; font-weight: bold; color: #1f1f1f; margin-bottom: 1rem; }
-</style>
-""", unsafe_allow_html=True)
+# Theme switcher (global CSS based on session_state)
+if "theme" not in st.session_state:
+    st.session_state.theme = "light"
+theme = st.session_state.theme
 
-# Navigation logic
+if theme == "dark":
+    st.markdown("""
+    <style>
+    body, .stApp {
+        background-color: #1e1e1e;
+        color: #ffffff;
+    }
+    .css-1d391kg, .css-18e3th9 {
+        background-color: #1e1e1e;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+    <style>
+    body, .stApp {
+        background-color: #f5f7fa;
+        color: #000000;
+    }
+    .css-1d391kg, .css-18e3th9 {
+        background-color: white;
+        color: black;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Page logic
 if page == "Dashboard":
-    st.markdown('<div class="header">📊 Earthquake Dashboard Overview</div>', unsafe_allow_html=True)
-    
+    st.markdown("## 📊 Earthquake Dashboard Overview")
     col1, col2, col3 = st.columns(3)
     col1.metric("🌐 Events Tracked", "9,512", "+12")
     col2.metric("🟢 Low Risk", "6,211", "-5%")
     col3.metric("🔴 High Risk", "1,103", "+14%")
-    
-    st.markdown("✅ More charts coming soon!")
+    st.markdown("✅ More charts and summaries coming soon!")
 
 elif page == "Predict Alert Level":
-    st.markdown('<div class="header">🚨 Earthquake Alert Prediction</div>', unsafe_allow_html=True)
-
+    st.markdown("## 🚨 Predict Earthquake Alert Level")
     with st.form("predict_form"):
         c1, c2 = st.columns(2)
         with c1:
@@ -52,7 +72,7 @@ elif page == "Predict Alert Level":
             rms = st.number_input("RMS", 0.0, 5.0, 1.1)
             magError = st.number_input("Magnitude Error", 0.0, 10.0, 0.1)
             magNst = st.number_input("MagNst", 0, 500, 20)
-        
+
         year = st.number_input("Year", 1976, 2025, 2023)
         month = st.slider("Month", 1, 12, 6)
         hour = st.slider("Hour", 0, 23, 12)
@@ -78,10 +98,10 @@ elif page == "Predict Alert Level":
             input_scaled = scaler.transform(input_data)
             pred = model.predict(input_scaled)[0]
             alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
-            st.success(f"Predicted Alert Level: **{alert_map.get(pred, pred)}**")
+            st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred, pred)}**")
 
 elif page == "Alert Definitions":
-    st.markdown('<div class="header">📘 Alert Level Definitions</div>', unsafe_allow_html=True)
+    st.markdown("## 📘 Alert Level Definitions")
     st.markdown("""
     - 🟢 **Green**: Minimal risk — informational only.  
     - 🟡 **Yellow**: Moderate impact possible — stay aware.  
@@ -90,7 +110,9 @@ elif page == "Alert Definitions":
     """)
 
 elif page == "Settings":
-    st.markdown('<div class="header">⚙️ Settings</div>', unsafe_allow_html=True)
-    st.markdown("Coming soon: model versioning, user preferences, and theme switcher.")
+    st.markdown("## ⚙️ Settings")
+    st.markdown("### 🎨 Theme Preferences")
 
-
+    theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if st.session_state.theme == "light" else 1)
+    st.session_state.theme = theme_choice
+    st.success(f"✅ Theme set to: {theme_choice.capitalize()} mode")
