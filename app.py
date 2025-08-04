@@ -7,11 +7,48 @@ import matplotlib.pyplot as plt
 model = joblib.load("earthquake_alert_model.joblib")
 scaler = joblib.load("scaler.joblib")
 
-st.set_page_config(page_title="Earthquake Alert System", layout="wide")
+# Set up page
+st.set_page_config(page_title="Modern Earthquake Dashboard", layout="wide")
 
-st.sidebar.title("📊 Navigation")
-page = st.sidebar.radio("Go to", [
-    "Upload & Analyze", "Predict Single Alert", "Alert Definitions", "Settings"
+# CSS Styling
+st.markdown("""
+<style>
+/* Sidebar background */
+section[data-testid="stSidebar"] {
+    background-color: #111;
+    color: white;
+}
+/* Header */
+h1, h2, h3 {
+    color: #003366;
+    font-family: 'Segoe UI', sans-serif;
+}
+/* Button */
+.stButton > button {
+    background-color: #0052cc;
+    color: white;
+    border-radius: 10px;
+    padding: 0.6rem 1.2rem;
+    font-weight: bold;
+}
+/* Card style */
+div[data-testid="stMetric"] {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Sidebar navigation
+st.sidebar.image("https://img.icons8.com/ios-filled/50/ffffff/earthquakes.png", width=60)
+st.sidebar.markdown("## 🌍 Earthquake App")
+section = st.sidebar.radio("Choose Page", [
+    "📂 Upload & Analyze",
+    "🚨 Single Prediction",
+    "📘 Alert Guide",
+    "⚙️ Settings"
 ])
 
 # Theme state
@@ -19,37 +56,23 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
-# Theme styling
-if theme == "dark":
-    st.markdown("""
-    <style>
-    body, .stApp { background-color: #1e1e1e; color: white; }
-    .css-1d391kg, .css-18e3th9 { background-color: #1e1e1e; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
-else:
-    st.markdown("""
-    <style>
-    body, .stApp { background-color: #f5f7fa; color: black; }
-    .css-1d391kg, .css-18e3th9 { background-color: white; color: black; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# Upload & Analyze
-if page == "Upload & Analyze":
+# Upload & Analyze Page
+if section == "📂 Upload & Analyze":
     st.title("📂 Upload Earthquake CSV and Predict Alerts")
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
     if uploaded_file:
         df = pd.read_csv(uploaded_file)
-        st.markdown("### 🧾 Preview")
+        st.markdown("### 🧾 File Preview")
         st.dataframe(df.head())
 
-        required_cols = ["latitude", "longitude", "depth", "mag", "magType",
-                         "nst", "gap", "dmin", "rms", "horizontalError",
-                         "depthError", "magError", "magNst", "status",
-                         "locationSource", "magSource", "type",
-                         "year", "month", "hour"]
+        required_cols = [
+            "latitude", "longitude", "depth", "mag", "magType",
+            "nst", "gap", "dmin", "rms", "horizontalError",
+            "depthError", "magError", "magNst", "status",
+            "locationSource", "magSource", "type",
+            "year", "month", "hour"
+        ]
 
         if all(col in df.columns for col in required_cols):
             def encode(val):
@@ -61,34 +84,34 @@ if page == "Upload & Analyze":
                 }
                 return enc.get(val, 0)
 
+            # Encode categorical
             df["magType"] = df["magType"].apply(encode)
             df["status"] = df["status"].apply(encode)
             df["locationSource"] = df["locationSource"].apply(encode)
             df["magSource"] = df["magSource"].apply(encode)
             df["type"] = df["type"].apply(encode)
 
-            features = df[required_cols]
-            scaled = scaler.transform(features)
+            scaled = scaler.transform(df[required_cols])
             preds = model.predict(scaled)
             alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
             df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
 
-            st.success("✅ Prediction complete!")
-            st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head(10))
+            st.success("✅ Predictions completed!")
+            st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
 
             st.markdown("### 📊 Alert Distribution")
-            summary = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
+            count_df = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
             fig, ax = plt.subplots()
-            ax.bar(summary["Alert"], summary["Count"], color=["green", "orange", "red", "gold"])
+            ax.bar(count_df["Alert"], count_df["Count"], color=["green", "orange", "red", "gold"])
             ax.set_ylabel("Count")
             ax.set_title("Predicted Alert Level Distribution")
             st.pyplot(fig)
         else:
-            st.error("❌ Missing required columns in the uploaded file.")
+            st.error("❌ Missing required columns. Please upload a complete file.")
 
-# Single Prediction
-elif page == "Predict Single Alert":
-    st.title("🚨 Predict Earthquake Alert Level")
+# Single Prediction Page
+elif section == "🚨 Single Prediction":
+    st.title("🚨 Predict a Single Earthquake Alert Level")
     with st.form("predict_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -128,23 +151,19 @@ elif page == "Predict Single Alert":
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
 
-# Alert Definitions
-elif page == "Alert Definitions":
-    st.title("📘 Alert Level Definitions")
+# Alert Guide Page
+elif section == "📘 Alert Guide":
+    st.title("📘 Earthquake Alert Level Guide")
     st.markdown("""
     - 🟢 **Green**: Minimal risk  
-    - 🟡 **Yellow**: Moderate risk  
-    - 🟠 **Orange**: High potential impact  
-    - 🔴 **Red**: Critical impact expected  
+    - 🟡 **Yellow**: Moderate impact possible  
+    - 🟠 **Orange**: High risk — preparation advised  
+    - 🔴 **Red**: Severe — immediate action needed  
     """)
 
-# Settings
-elif page == "Settings":
-    st.title("⚙️ Settings")
-    st.markdown("### 🎨 Theme Preferences")
+# Settings Page
+elif section == "⚙️ Settings":
+    st.title("⚙️ App Settings")
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
     st.session_state.theme = theme_choice
-    st.markdown(
-        f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>",
-        unsafe_allow_html=True
-    )
+    st.markdown(f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>", unsafe_allow_html=True)
