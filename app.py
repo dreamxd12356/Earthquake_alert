@@ -7,6 +7,30 @@ import matplotlib.pyplot as plt
 model = joblib.load("earthquake_alert_model.joblib")
 scaler = joblib.load("scaler.joblib")
 
+# Default values for missing columns
+default_values = {
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "depth": 10.0,
+    "mag": 5.0,
+    "magType": 3,
+    "nst": 20,
+    "gap": 45.0,
+    "dmin": 1.0,
+    "rms": 1.0,
+    "horizontalError": 1.0,
+    "depthError": 1.0,
+    "magError": 0.2,
+    "magNst": 20,
+    "status": 1,
+    "locationSource": 0,
+    "magSource": 0,
+    "type": 0,
+    "year": 2023,
+    "month": 6,
+    "hour": 12
+}
+
 # Set up page
 st.set_page_config(page_title="Modern Earthquake Dashboard", layout="wide")
 
@@ -37,7 +61,6 @@ div[data-testid="stMetric"] {
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar navigation
 st.sidebar.image("https://img.icons8.com/ios-filled/50/ffffff/earthquakes.png", width=60)
 st.sidebar.markdown("## 🌍 Earthquake App")
 section = st.sidebar.radio("Choose Page", [
@@ -51,68 +74,39 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
-# Encode function
-def encode(val):
-    enc = {
-        'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
-        'automatic': 0, 'reviewed': 1,
-        'ci': 0, 'hv': 1, 'nc': 2, 'nm': 3, 'se': 4, 'us': 5,
-        'earthquake': 0
-    }
-    return enc.get(val, 0)
-
-required_cols = [
-    "latitude", "longitude", "depth", "mag", "magType",
-    "nst", "gap", "dmin", "rms", "horizontalError",
-    "depthError", "magError", "magNst", "status",
-    "locationSource", "magSource", "type",
-    "year", "month", "hour"
-]
-
-default_values = {
-    "latitude": 0.0, "longitude": 0.0, "depth": 10.0, "mag": 5.0, "magType": "mb",
-    "nst": 100, "gap": 45.0, "dmin": 1.0, "rms": 1.0, "horizontalError": 1.0,
-    "depthError": 1.0, "magError": 0.2, "magNst": 20, "status": "reviewed",
-    "locationSource": "ci", "magSource": "ci", "type": "earthquake",
-    "year": 2023, "month": 6, "hour": 12
-}
-
-# Upload & Analyze Page
 if section == "📂 Upload & Analyze":
-    st.title("📂 Upload Earthquake Data")
-    uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
+    st.title("📂 Upload Earthquake CSV and Predict Alerts")
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
     if uploaded_file:
-        try:
-            if uploaded_file.name.endswith(".xlsx"):
-                df = pd.read_excel(uploaded_file)
-            else:
-                df = pd.read_csv(uploaded_file)
-        except Exception as e:
-            st.error(f"❌ Error reading file: {e}")
-            st.stop()
-
-        st.markdown("### 🧾 File Preview")
+        df = pd.read_csv(uploaded_file)
+        st.markdown("### 🦾 File Preview")
         st.dataframe(df.head())
 
-        missing_cols = [col for col in required_cols if col not in df.columns]
+        # Encode categoricals if present
+        def encode(val):
+            enc = {
+                'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
+                'automatic': 0, 'reviewed': 1,
+                'ci': 0, 'hv': 1, 'nc': 2, 'nm': 3, 'se': 4, 'us': 5,
+                'earthquake': 0
+            }
+            return enc.get(val, 0)
+
+        encode_cols = ["magType", "status", "locationSource", "magSource", "type"]
+        for col in encode_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(encode)
+
+        # Handle missing columns with defaults
+        expected_cols = scaler.feature_names_in_
+        missing_cols = [col for col in expected_cols if col not in df.columns]
+
         for col in missing_cols:
-            df[col] = default_values[col]
-        if missing_cols:
-            st.info(f"""
-            ℹ️ Your file was missing the following columns, which were filled with default values:
+            df[col] = default_values.get(col, 0)
 
-            **{', '.join(missing_cols)}**
-            """)
-
-        # Encode categoricals
-        df["magType"] = df["magType"].apply(encode)
-        df["status"] = df["status"].apply(encode)
-        df["locationSource"] = df["locationSource"].apply(encode)
-        df["magSource"] = df["magSource"].apply(encode)
-        df["type"] = df["type"].apply(encode)
-
-        df_scaled = scaler.transform(df[required_cols])
+        df = df.reindex(columns=expected_cols)
+        df_scaled = scaler.transform(df)
         preds = model.predict(df_scaled)
 
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
@@ -121,6 +115,20 @@ if section == "📂 Upload & Analyze":
         st.success("✅ Predictions completed!")
         st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
 
+        if missing_cols:
+            st.warning("""
+            Some columns were missing from your file and filled with default values:
+            - {}
+            """.format(", ".join(missing_cols)))
+
+        # Download button
+        st.download_button("Download Predictions CSV", df.to_csv(index=False), "predictions.csv")
+
+        # Map View
+        st.markdown("### 🗺️ Earthquake Prediction Map")
+        st.map(df[["latitude", "longitude"]])
+
+        # Bar chart
         st.markdown("### 📊 Alert Distribution")
         count_df = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
         fig, ax = plt.subplots()
@@ -129,21 +137,8 @@ if section == "📂 Upload & Analyze":
         ax.set_title("Predicted Alert Level Distribution")
         st.pyplot(fig)
 
-        # Map View
-        st.markdown("### 🗺️ Map of Earthquake Locations")
-        st.map(df[["latitude", "longitude"]])
-
-        # Download prediction
-        st.download_button(
-            label="📥 Download Predictions as CSV",
-            data=df.to_csv(index=False).encode("utf-8"),
-            file_name="predictions.csv",
-            mime="text/csv"
-        )
-
-# Single Prediction Page
 elif section == "🚨 Single Prediction":
-    st.title("🚨 Predict a Single Earthquake Alert Level")
+    st.title("Predict a Single Earthquake Alert Level")
     with st.form("predict_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -166,16 +161,40 @@ elif section == "🚨 Single Prediction":
         submitted = st.form_submit_button("Predict")
 
     if submitted:
-        input_data = [[
-            latitude, longitude, depth, mag, encode(magType), nst, gap, dmin,
-            rms, 1.0, 1.0, magError, magNst, encode(status), 0, 0, 0, year, month, hour
-        ]]
-        scaled = scaler.transform(input_data)
-        pred = model.predict(scaled)[0]
+        def encode(val):
+            enc = {
+                'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
+                'automatic': 0, 'reviewed': 1,
+                'earthquake': 0
+            }
+            return enc.get(val, 0)
+
+        input_dict = default_values.copy()
+        input_dict.update({
+            "latitude": latitude,
+            "longitude": longitude,
+            "depth": depth,
+            "mag": mag,
+            "magType": encode(magType),
+            "nst": nst,
+            "gap": gap,
+            "dmin": dmin,
+            "rms": rms,
+            "magError": magError,
+            "magNst": magNst,
+            "status": encode(status),
+            "year": year,
+            "month": month,
+            "hour": hour
+        })
+
+        input_df = pd.DataFrame([input_dict])
+        input_df = input_df.reindex(columns=scaler.feature_names_in_)
+        input_scaled = scaler.transform(input_df)
+        pred = model.predict(input_scaled)[0]
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
 
-# Alert Guide Page
 elif section == "📘 Alert Guide":
     st.title("📘 Earthquake Alert Level Guide")
     st.markdown("""
@@ -185,7 +204,6 @@ elif section == "📘 Alert Guide":
     - 🔴 **Red**: Severe — immediate action needed  
     """)
 
-# Settings Page
 elif section == "⚙️ Settings":
     st.title("⚙️ App Settings")
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
