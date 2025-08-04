@@ -114,6 +114,7 @@ elif page == "Settings":
     st.markdown("### 🎨 Theme Preferences")
 
    st.markdown("### <span style='color:yellow;'>🎨 Choose Theme</span>", unsafe_allow_html=True)
-theme_choice = st.radio("", ["light", "dark"], index=0 if st.session_state.theme == "light" else 1)
+    theme_choice = st.radio("", ["light", "dark"], index=0 if st.session_state.theme == "light" else 1)
     st.markdown(f"<h4 style='color:yellow;'>Theme set to: {theme_choice.upper()} MODE</h4>", unsafe_allow_html=True)
+
 
