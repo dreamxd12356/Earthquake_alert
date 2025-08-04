@@ -37,22 +37,18 @@ div[data-testid="stMetric"] {
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar
+# Sidebar navigation
 st.sidebar.image("https://img.icons8.com/ios-filled/50/ffffff/earthquakes.png", width=60)
 st.sidebar.markdown("## 🌍 Earthquake App")
 section = st.sidebar.radio("Choose Page", [
-    "📂 Upload & Analyze",
-    "🚨 Single Prediction",
-    "📘 Alert Guide",
-    "⚙️ Settings"
+    "📂 Upload & Analyze", "🚨 Single Prediction", "📘 Alert Guide", "⚙️ Settings"
 ])
 
-# Theme state
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
-# Encoding logic
+# Encode helper
 def encode(val):
     enc = {
         'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
@@ -62,92 +58,83 @@ def encode(val):
     }
     return enc.get(val, 0)
 
-# Required columns
-required_cols = [
-    "latitude", "longitude", "depth", "mag", "magType",
-    "nst", "gap", "dmin", "rms", "horizontalError",
-    "depthError", "magError", "magNst", "status",
-    "locationSource", "magSource", "type",
-    "year", "month", "hour"
-]
-defaults = {
-    "latitude": 0.0,
-    "longitude": 0.0,
-    "depth": 10.0,
-    "mag": 5.0,
-    "magType": "mb",
-    "nst": 0,
-    "gap": 0.0,
-    "dmin": 0.0,
-    "rms": 1.0,
-    "horizontalError": 1.0,
-    "depthError": 1.0,
-    "magError": 0.1,
-    "magNst": 0,
-    "status": "reviewed",
-    "locationSource": "ci",
-    "magSource": "ci",
-    "type": "earthquake",
-    "year": 2023,
-    "month": 1,
-    "hour": 12
-}
-alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
-
 # Upload & Analyze
 if section == "📂 Upload & Analyze":
-    st.title("📂 Upload Earthquake File and Predict Alerts")
+    st.title("📂 Upload Earthquake CSV and Predict Alerts")
     uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
     if uploaded_file:
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
 
         st.markdown("### 🧾 File Preview")
         st.dataframe(df.head())
 
-        df_filled = df.copy()
+        required_cols = [
+            "latitude", "longitude", "depth", "mag", "magType",
+            "nst", "gap", "dmin", "rms", "horizontalError",
+            "depthError", "magError", "magNst", "status",
+            "locationSource", "magSource", "type",
+            "year", "month", "hour"
+        ]
+
         missing_cols = [col for col in required_cols if col not in df.columns]
+        default_values = {
+            "latitude": 0.0, "longitude": 0.0, "depth": 10.0, "mag": 5.0,
+            "magType": "mb", "nst": 10, "gap": 45.0, "dmin": 1.0,
+            "rms": 1.0, "horizontalError": 1.0, "depthError": 1.0,
+            "magError": 0.2, "magNst": 10, "status": "reviewed",
+            "locationSource": "ci", "magSource": "ci", "type": "earthquake",
+            "year": 2023, "month": 1, "hour": 12
+        }
 
         for col in missing_cols:
-            df_filled[col] = defaults[col]
-
+            df[col] = default_values[col]
         if missing_cols:
             st.warning(f"""
-            ⚠️ The following required columns were missing and have been filled with default values:
-            `{', '.join(missing_cols)}`
+            ⚠️ The following columns were missing and filled with default values:\n
+            **{', '.join(missing_cols)}**
             """)
 
-        for col in ["magType", "status", "locationSource", "magSource", "type"]:
-            df_filled[col] = df_filled[col].apply(encode)
+        # Encode
+        df["magType"] = df["magType"].apply(encode)
+        df["status"] = df["status"].apply(encode)
+        df["locationSource"] = df["locationSource"].apply(encode)
+        df["magSource"] = df["magSource"].apply(encode)
+        df["type"] = df["type"].apply(encode)
 
-        df_model = df_filled[required_cols].copy()
-        df_model.columns = scaler.feature_names_in_
-
-        scaled = scaler.transform(df_model)
+        # Scale & Predict
+        scaled = scaler.transform(df[required_cols])
         preds = model.predict(scaled)
-        df_filled["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
+        alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
+        df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
 
         st.success("✅ Predictions completed!")
-        st.dataframe(df_filled[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
+        st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
 
         st.markdown("### 📊 Alert Distribution")
-        count_df = df_filled["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
+        count_df = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
         fig, ax = plt.subplots()
         ax.bar(count_df["Alert"], count_df["Count"], color=["green", "orange", "red", "gold"])
         ax.set_ylabel("Count")
         ax.set_title("Predicted Alert Level Distribution")
         st.pyplot(fig)
 
-        st.markdown("### 🗺️ Map of Predictions")
-        st.map(df_filled[["latitude", "longitude"]])
+        st.map(df[["latitude", "longitude"]])
 
-        st.markdown("### 💾 Download Results")
-        csv = df_filled.to_csv(index=False).encode('utf-8')
-        df_filled.to_excel("predictions.xlsx", index=False)
-        st.download_button("📥 Download CSV", csv, "predictions.csv", "text/csv")
-        st.download_button("📥 Download Excel", open("predictions.xlsx", "rb").read(), "predictions.xlsx")
+        # Download
+        st.download_button("📥 Download CSV", df.to_csv(index=False), file_name="predictions.csv", mime="text/csv")
+        try:
+            df.to_excel("predictions.xlsx", index=False)
+            with open("predictions.xlsx", "rb") as f:
+                st.download_button("📥 Download Excel", f, file_name="predictions.xlsx")
+        except Exception:
+            st.warning("⚠️ Could not generate Excel file. Please ensure `openpyxl` is installed.")
 
-# Single Prediction
+
+# Single Prediction Page
 elif section == "🚨 Single Prediction":
     st.title("🚨 Predict a Single Earthquake Alert Level")
     with st.form("predict_form"):
@@ -166,48 +153,22 @@ elif section == "🚨 Single Prediction":
             rms = st.number_input("RMS", 0.0, 5.0, 1.0)
             magError = st.number_input("Magnitude Error", 0.0, 10.0, 0.2)
             magNst = st.number_input("MagNst", 0, 500, 20)
+
         year = st.number_input("Year", 1976, 2025, 2023)
         month = st.slider("Month", 1, 12, 6)
         hour = st.slider("Hour", 0, 23, 12)
         submitted = st.form_submit_button("Predict")
 
     if submitted:
-        input_data = pd.DataFrame([{
-            "latitude": latitude,
-            "longitude": longitude,
-            "depth": depth,
-            "mag": mag,
-            "magType": encode(magType),
-            "nst": nst,
-            "gap": gap,
-            "dmin": dmin,
-            "rms": rms,
-            "horizontalError": 1.0,
-            "depthError": 1.0,
-            "magError": magError,
-            "magNst": magNst,
-            "status": encode(status),
-            "locationSource": encode("ci"),
-            "magSource": encode("ci"),
-            "type": encode("earthquake"),
-            "year": year,
-            "month": month,
-            "hour": hour
-        }])
-
-        input_data.columns = scaler.feature_names_in_
+        input_data = [[
+            latitude, longitude, depth, mag, encode(magType), nst, gap, dmin,
+            rms, 1.0, 1.0, magError, magNst, encode(status), 0, 0, 0, year, month, hour
+        ]]
         scaled = scaler.transform(input_data)
         pred = model.predict(scaled)[0]
-
-        result_df = input_data.copy()
-        result_df["Predicted Alert"] = alert_map.get(pred)
+        alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
 
-        # Download single prediction
-        csv_single = result_df.to_csv(index=False).encode("utf-8")
-        result_df.to_excel("single_prediction.xlsx", index=False)
-        st.download_button("📥 Download CSV", csv_single, "single_prediction.csv")
-        st.download_button("📥 Download Excel", open("single_prediction.xlsx", "rb").read(), "single_prediction.xlsx")
 
 # Alert Guide
 elif section == "📘 Alert Guide":
