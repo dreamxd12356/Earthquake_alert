@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 
@@ -8,7 +7,7 @@ import matplotlib.pyplot as plt
 model = joblib.load("earthquake_alert_model.joblib")
 scaler = joblib.load("scaler.joblib")
 
-# Set page config
+# Set up page
 st.set_page_config(page_title="Modern Earthquake Dashboard", layout="wide")
 
 # CSS Styling
@@ -38,7 +37,7 @@ div[data-testid="stMetric"] {
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar
+# Sidebar navigation
 st.sidebar.image("https://img.icons8.com/ios-filled/50/ffffff/earthquakes.png", width=60)
 st.sidebar.markdown("## 🌍 Earthquake App")
 section = st.sidebar.radio("Choose Page", [
@@ -48,12 +47,12 @@ section = st.sidebar.radio("Choose Page", [
     "⚙️ Settings"
 ])
 
-# Theme setting
+# Theme state
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
 theme = st.session_state.theme
 
-# Common values
+# Required columns
 required_cols = [
     "latitude", "longitude", "depth", "mag", "magType",
     "nst", "gap", "dmin", "rms", "horizontalError",
@@ -62,6 +61,7 @@ required_cols = [
     "year", "month", "hour"
 ]
 
+# Encoder
 def encode(val):
     enc = {
         'mb': 0, 'ml': 1, 'ms': 2, 'mw': 3, 'mwc': 4, 'mwr': 5,
@@ -81,37 +81,36 @@ if section == "📂 Upload & Analyze":
         st.markdown("### 🧾 File Preview")
         st.dataframe(df.head())
 
+        # Detect missing required columns
         missing_cols = [col for col in required_cols if col not in df.columns]
         for col in missing_cols:
-            df[col] = 0  # Add default value for missing column
+            df[col] = 0  # Default value
 
         if missing_cols:
             st.warning(f"""
-            ⚠️ The following required columns were **missing** from your file and have been **filled with default values (0)**:\n
+            ⚠️ The following required columns were missing from your file and have been filled with default values (0):
+
             `{', '.join(missing_cols)}`
             """)
 
         # Encode categorical
-        df["magType"] = df["magType"].apply(encode)
-        df["status"] = df["status"].apply(encode)
-        df["locationSource"] = df["locationSource"].apply(encode)
-        df["magSource"] = df["magSource"].apply(encode)
-        df["type"] = df["type"].apply(encode)
+        for cat_col in ["magType", "status", "locationSource", "magSource", "type"]:
+            if cat_col in df.columns:
+                df[cat_col] = df[cat_col].apply(encode)
 
-        # Scale input safely using .values
+        # Fill all remaining NaNs in required columns
+        df[required_cols] = df[required_cols].fillna(0)
+
+        # Scale and Predict
         df_scaled = scaler.transform(df[required_cols].values)
         preds = model.predict(df_scaled)
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
 
+        # Output
         st.success("✅ Predictions completed!")
         st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
 
-        # Map view
-        st.markdown("### 🗺️ Earthquake Map")
-        st.map(df[["latitude", "longitude"]])
-
-        # Distribution
         st.markdown("### 📊 Alert Distribution")
         count_df = df["Predicted Alert"].value_counts().rename_axis("Alert").reset_index(name="Count")
         fig, ax = plt.subplots()
@@ -120,9 +119,16 @@ if section == "📂 Upload & Analyze":
         ax.set_title("Predicted Alert Level Distribution")
         st.pyplot(fig)
 
-        # CSV Download
-        st.download_button("⬇️ Download Predictions (CSV)", df.to_csv(index=False), file_name="predictions.csv", mime="text/csv")
+        # Map view
+        st.map(df[["latitude", "longitude"]])
 
+        # CSV download
+        st.download_button(
+            label="🔧 Download Results as CSV",
+            data=df.to_csv(index=False),
+            file_name="earthquake_predictions.csv",
+            mime="text/csv"
+        )
 
 # Single Prediction
 elif section == "🚨 Single Prediction":
@@ -150,11 +156,11 @@ elif section == "🚨 Single Prediction":
 
     if submitted:
         input_data = [[
-            latitude, longitude, depth, mag, encode(magType), nst, gap, dmin,
-            rms, 1.0, 1.0, magError, magNst, encode(status), 0, 0, 0,
-            year, month, hour
+            latitude, longitude, depth, mag, encode(magType),
+            nst, gap, dmin, rms, 1.0, 1.0, magError, magNst, encode(status),
+            0, 0, 0, year, month, hour
         ]]
-        input_scaled = scaler.transform(np.array(input_data))
+        input_scaled = scaler.transform(input_data)
         pred = model.predict(input_scaled)[0]
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
         st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
@@ -165,7 +171,7 @@ elif section == "📘 Alert Guide":
     st.markdown("""
     - 🟢 **Green**: Minimal risk  
     - 🟡 **Yellow**: Moderate impact possible  
-    - 🟠 **Orange**: High risk — preparation advised  
+    - 🔶 **Orange**: High risk — preparation advised  
     - 🔴 **Red**: Severe — immediate action needed  
     """)
 
