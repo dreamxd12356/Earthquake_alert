@@ -107,7 +107,17 @@ if section == "📂 Upload & Analyze":
             ax.set_title("Predicted Alert Level Distribution")
             st.pyplot(fig)
         else:
-            st.error("❌ Missing required columns. Please upload a complete file.")
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    st.warning(f"""
+    ⚠️ Your uploaded file is missing one or more required columns.
+
+    **Required columns:**  
+    `{', '.join(required_cols)}`
+
+    **Missing from your file:**  
+    `{', '.join(missing_cols) if missing_cols else 'None'}`
+    """)
+
 
 # Single Prediction Page
 elif section == "🚨 Single Prediction":
@@ -167,3 +177,4 @@ elif section == "⚙️ Settings":
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
     st.session_state.theme = theme_choice
     st.markdown(f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>", unsafe_allow_html=True)
+
