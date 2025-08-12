@@ -38,7 +38,6 @@ div[data-testid="stMetric"] {
 """, unsafe_allow_html=True)
 
 # Sidebar navigation
-st.sidebar.image("https://img.icons8.com/ios-filled/50/ffffff/earthquakes.png", width=60)
 st.sidebar.markdown("##  Earthquake App")
 section = st.sidebar.radio("Choose Page", [
     "Upload & Analyze",
@@ -181,4 +180,5 @@ elif section == "⚙️ Settings":
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
     st.session_state.theme = theme_choice
     st.markdown(f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>", unsafe_allow_html=True)
+
 
