@@ -39,12 +39,12 @@ div[data-testid="stMetric"] {
 
 # Sidebar navigation
 st.sidebar.image("https://img.icons8.com/ios-filled/50/ffffff/earthquakes.png", width=60)
-st.sidebar.markdown("## 🌍 Earthquake App")
+st.sidebar.markdown("##  Earthquake App")
 section = st.sidebar.radio("Choose Page", [
-    "📂 Upload & Analyze",
-    "🚨 Single Prediction",
-    "📘 Alert Guide",
-    "⚙️ Settings"
+    "Upload & Analyze",
+    "Single Prediction",
+    "Alert Guide",
+    "Settings"
 ])
 
 # Theme state
@@ -72,13 +72,13 @@ def encode(val):
     return enc.get(val, 0)
 
 # Upload & Analyze
-if section == "📂 Upload & Analyze":
-    st.title("📂 Upload Earthquake CSV and Predict Alerts")
+if section == "Upload & Analyze":
+    st.title("Upload Earthquake CSV and Predict Alerts")
     uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
     if uploaded_file:
         df = pd.read_csv(uploaded_file)
-        st.markdown("### 🧾 File Preview")
+        st.markdown("###File Preview")
         st.dataframe(df.head())
 
         # Detect missing required columns
@@ -88,7 +88,7 @@ if section == "📂 Upload & Analyze":
 
         if missing_cols:
             st.warning(f"""
-            ⚠️ The following required columns were missing from your file and have been filled with default values (0):
+              The following required columns were missing from your file and have been filled with default values (0):
 
             `{', '.join(missing_cols)}`
             """)
@@ -108,7 +108,7 @@ if section == "📂 Upload & Analyze":
         df["Predicted Alert"] = [alert_map.get(p, "UNKNOWN") for p in preds]
 
         # Output
-        st.success("✅ Predictions completed!")
+        st.success("Predictions completed!")
         st.dataframe(df[["latitude", "longitude", "mag", "depth", "Predicted Alert"]].head())
 
         st.markdown("### 📊 Alert Distribution")
@@ -131,8 +131,8 @@ if section == "📂 Upload & Analyze":
         )
 
 # Single Prediction
-elif section == "🚨 Single Prediction":
-    st.title("🚨 Predict a Single Earthquake Alert Level")
+elif section == "Single Prediction":
+    st.title("Predict a Single Earthquake Alert Level")
     with st.form("predict_form"):
         col1, col2 = st.columns(2)
         with col1:
@@ -163,16 +163,16 @@ elif section == "🚨 Single Prediction":
         input_scaled = scaler.transform(input_data)
         pred = model.predict(input_scaled)[0]
         alert_map = {0: "GREEN", 1: "ORANGE", 2: "RED", 3: "YELLOW"}
-        st.success(f"✅ Predicted Alert Level: **{alert_map.get(pred)}**")
+        st.success(f"Predicted Alert Level: **{alert_map.get(pred)}**")
 
 # Alert Guide
-elif section == "📘 Alert Guide":
-    st.title("📘 Earthquake Alert Level Guide")
+elif section == "Alert Guide":
+    st.title("Earthquake Alert Level Guide")
     st.markdown("""
-    - 🟢 **Green**: Minimal risk  
-    - 🟡 **Yellow**: Moderate impact possible  
-    - 🔶 **Orange**: High risk — preparation advised  
-    - 🔴 **Red**: Severe — immediate action needed  
+    - **Green**: Minimal risk  
+    - **Yellow**: Moderate impact possible  
+    - **Orange**: High risk — preparation advised  
+    - **Red**: Severe — immediate action needed  
     """)
 
 # Settings
@@ -181,3 +181,4 @@ elif section == "⚙️ Settings":
     theme_choice = st.radio("Choose Theme", ["light", "dark"], index=0 if theme == "light" else 1)
     st.session_state.theme = theme_choice
     st.markdown(f"<h4 style='color:yellow;'>✅ Theme set to: <b>{theme_choice.upper()} MODE</b></h4>", unsafe_allow_html=True)
+
